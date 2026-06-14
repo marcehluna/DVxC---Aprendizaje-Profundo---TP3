@@ -1,61 +1,71 @@
 # Conclusiones — TP3 Clasificador de Emociones
 
-Documento de trabajo para ir registrando resultados, observaciones y conclusiones del notebook `Luna-Marcelo-DL-TP3-CO24.ipynb`.
+> **⚠️ REVISAR ANTES DE LA ENTREGA:** borrador actualizado con la config **E6** (modelo final). Verificar métricas, redacción y coherencia con el notebook (`§1.8`, `§3`) y [`reporte-experimentos.md`](reporte-experimentos.md) antes de enviar el Colab.
+
+Documento de trabajo para el notebook `Luna-Marcelo-DL-TP3-CO24.ipynb`.
 
 ---
 
-## 1. Resultados del modelo actual (baseline)
+## 1. Resultados del modelo final (E6)
 
-Configuración principal: balanceo con `WeightedRandomSampler`, early stopping en `val_f1`, `LEARNING_RATE = 1e-3`, imágenes 48×48 en escala de grises, augmentations (volteo horizontal + color jitter).
+Configuración entregada: imágenes **64×64** en escala de grises, flip horizontal + ColorJitter, **sin** `WeightedRandomSampler`, **CrossEntropyLoss ponderada** (`sqrt_inverso`), early stopping en `val_f1`, dropout 0.5, Adam lr=1e-4.
 
 | Métrica | Validación |
 |---------|------------|
-| Accuracy | 73.3% |
-| F1 macro | 65.8% |
-| Mejor época | 19 (early stop en época 26) |
-| Loss | 0.80 |
+| Accuracy | **79.34%** |
+| F1 macro | **71.30%** |
+| Loss | **0.6097** |
+| Mejor época | **29** (early stop en época **34**) |
 
-### Rendimiento por clase
+### Rendimiento por clase (E6)
 
 | Clase | Precision | Recall | F1 | Observación |
 |-------|-----------|--------|-----|-------------|
-| alegría | 0.91 | 0.85 | 0.88 | Mejor clase; confusión menor con seriedad/tristeza |
-| sorpresa | 0.70 | 0.80 | 0.74 | Buen rendimiento |
-| enojo | 0.69 | 0.75 | 0.72 | Aceptable |
-| seriedad | 0.66 | 0.69 | 0.68 | Confusión con tristeza y sorpresa |
-| tristeza | 0.63 | 0.56 | 0.60 | Recall bajo; mucha confusión con seriedad |
-| miedo | 0.59 | 0.55 | 0.57 | Confusión con sorpresa (~19%) |
-| disgusto | 0.38 | 0.49 | 0.43 | Peor clase; confusión frecuente con seriedad |
+| alegría | 0.91 | 0.90 | **0.90** | Mejor clase; estable en todas las configs |
+| sorpresa | 0.81 | 0.79 | **0.80** | Buen rendimiento |
+| seriedad | 0.76 | 0.78 | **0.77** | Mejor recall que en configs anteriores |
+| tristeza | 0.70 | 0.71 | **0.71** | Sigue confundiéndose parcialmente con seriedad |
+| enojo | 0.71 | 0.69 | **0.70** | Aceptable |
+| miedo | 0.64 | 0.55 | **0.59** | Clase minoritaria; mejora leve vs E4 |
+| disgusto | 0.51 | 0.53 | **0.52** | Sigue siendo la más difícil, pero mejor que E0–E4 |
 
-El F1 macro (~66%) queda por debajo del accuracy (~73%) y del weighted F1 (~74%), lo que indica que las clases minoritarias o difíciles arrastran el rendimiento global.
-
----
-
-## 2. Evolución del entrenamiento (experimentos realizados)
-
-- **Sin balanceo de clases:** se observó sobreajuste.
-- **Con balanceo:** mejoró notablemente, pero persistió overfitting residual y ruido en las curvas.
-- **Learning rate reducido:** disminuyó el ruido; el sobreajuste residual continuó.
-- **Early stopping (`val_f1`, paciencia 7):** el entrenamiento se detuvo alrededor de la época 26; se restauraron los pesos de la época 19 (mejor `val_f1`: 0.6582). Mejoró la matriz de confusión en disgusto (ej.: disgusto/disgusto pasó de ~0.23 a ~0.37; disgusto/seriedad bajó de ~0.38 a ~0.19).
-
-<!-- Agregar aquí nuevos experimentos -->
-<!-- Ejemplo: -->
-<!-- - **64×64 + rotación + recorte:** acc __%, F1 macro __% -->
+El F1 macro (71.3%) queda más alineado con el accuracy (79.3%) que en el baseline (~66% vs ~75%), gracias a la compensación del desbalance vía loss ponderada (sin sampler).
 
 ---
 
-## 3. Patrones en la matriz de confusión
+## 2. Evolución del entrenamiento (experimentos E0–E6)
 
-1. **Tristeza ↔ seriedad:** par más problemático. Expresiones neutras/negativas similares en imágenes de 48×48 en escala de grises.
-2. **Disgusto → seriedad:** el balanceo ayuda el recall de disgusto pero baja la precisión (muchas predicciones incorrectas hacia o desde seriedad).
-3. **Miedo ↔ sorpresa:** ojos y boca abiertos se confunden a baja resolución.
-4. **Train acc < val acc** (~64% vs ~73% en la mejor época): comportamiento esperable con balanceo, dropout y augmentations solo en entrenamiento.
+| Exp | Cambio principal | F1 macro | Resultado |
+|-----|------------------|----------|-----------|
+| E0 | Baseline (48×48, sampler, early stop `val_loss`) | 66.7% | Punto de partida |
+| E1 | Early stopping → `val_f1` | 69.5% | Mejor criterio de checkpoint |
+| E2 | Loss `sqrt_inverso` + sampler | 66.0% | Descartado (doble compensación) |
+| E3 | Dropout FC 0.6 | 68.4% | Descartado |
+| E4 | Resolución 64×64 | 69.7% | Mejor config hasta E6 |
+| E5 | Rotación ±10° | 68.8% | Descartado |
+| **E6** | Loss `sqrt_inverso` **sin** sampler | **71.3%** | **Config final** |
 
-Confusiones más frecuentes (validación, modelo actual):
+Aprendizajes clave:
 
-- Tristeza real → seriedad predicha: 106 casos (~22% de tristeza).
-- Disgusto real → seriedad predicha: 34 casos (~21% de disgusto).
-- Miedo real → sorpresa predicha: 14 casos (~19% de miedo).
+- **Early stopping en `val_f1`** (E1) alinea el checkpoint con el objetivo de evaluación.
+- **64×64** (E4) aporta detalle facial útil para pares confusos.
+- **Loss ponderada sin sampler** (E6) supera sampler solo (E4) y sampler+loss (E2): un solo mecanismo de compensación es suficiente.
+- Rotación suave (E5) y dropout extra (E3) no mejoraron sobre E4/E6.
+
+---
+
+## 3. Patrones en la matriz de confusión (E6)
+
+1. **Tristeza ↔ seriedad:** sigue siendo el par más problemático, aunque E6 reduce confusiones respecto a configs con 48×48.
+2. **Disgusto:** F1 ~0.52; recall ~0.53 con precision ~0.51 — más equilibrado que E2/E4, donde subía recall a costa de precision.
+3. **Miedo ↔ sorpresa:** confusión residual por expresiones con ojos/boca abiertos; miedo F1 ~0.59.
+4. **Train acc > val acc** (~87% vs ~79% en mejor época E6): muestreo natural (sin sampler) + augmentations solo en train; distinto al patrón con balanceo (E4).
+
+Confusiones relevantes en validación (E6, matriz normalizada):
+
+- Tristeza real → seriedad predicha: ~14% de tristeza.
+- Disgusto real → seriedad predicha: ~14% de disgusto.
+- Miedo real → sorpresa predicha: ~12% de miedo.
 
 ---
 
@@ -73,86 +83,80 @@ Distribución aproximada en entrenamiento:
 | enojo | ~705 |
 | miedo | ~281 |
 
-Las clases con menos ejemplos (miedo, disgusto, enojo) coinciden con los F1 más bajos, aunque el balanceo mitiga parcialmente el efecto.
+**Estrategia adoptada (E6):** pesos `sqrt_inverso` en la loss, **sin** oversampling en el DataLoader. Evita la sobre-compensación observada en E2 cuando se combinaron sampler y loss.
 
 ---
 
 ## 5. Inferencia en imágenes propias (puntos 4 y 5)
 
-En validación, tristeza **no** está sobre-predicha (recall 56%, precision 63%). Si en fotos propias el modelo sesga hacia tristeza u otra clase, lo más probable es **domain shift**:
+> **⚠️ REVISAR ANTES DE LA ENTREGA:** completar con resultados de fotos propias y ajustar redacción según lo observado.
 
 | Entrenamiento / validación | Imágenes propias |
 |----------------------------|------------------|
-| Rostros ya alineados (`*_aligned.jpg`) | Fotos completas, otro encuadre e iluminación |
-| Pipeline fijo 48×48 gris | Sin recorte o recorte Haar imperfecto |
+| Rostros alineados (`*_aligned.jpg`), 64×64 gris | Fotos completas, otro encuadre e iluminación |
+| Pipeline `transform_val` (sin augmentations) | Recorte Haar (punto 5) recomendado |
 
 Observaciones:
 
-- En inferencia debe usarse siempre **`transform_val`** (sin augmentations de entrenamiento).
-- El **punto 5** (detección de rostro + recorte) suele ser más confiable que el punto 4 para fotos reales.
-- Conviene revisar los scores softmax: si top-1 y top-2 están muy cerca, la predicción es incierta.
+- Usar siempre **`transform_val`** en inferencia (64×64, sin rotación ni ColorJitter).
+- El **punto 5** (Haar + recorte) suele ser más confiable que el punto 4 para fotos reales.
+- Revisar scores softmax cuando top-1 y top-2 están muy cercanos.
 
-Parámetros actuales de detección Haar: `SCALE_FACTOR=1.1`, `MIN_NEIGHBORS=6`, `MIN_SIZE=(30,30)`.
+Parámetros Haar actuales: `SCALE_FACTOR=1.1`, `MIN_NEIGHBORS=6`, `MIN_SIZE=(30,30)`.
 
 <!-- Registrar resultados de pruebas con imágenes propias -->
-<!-- Ejemplo: -->
 <!-- - Punto 4 (sin recorte): X/Y aciertos -->
 <!-- - Punto 5 (con Haar): X/Y aciertos -->
 
 ---
 
-## 6. Conclusiones generales (borrador para el informe)
+## 6. Conclusiones generales (borrador para el informe / Colab)
 
-- Se construyó una CNN desde cero con pipeline de preprocesamiento configurable (resize, escala de grises, normalización, augmentations, balanceo).
-- El balanceo de clases y el early stopping en F1 macro fueron decisiones clave: sin balanceo había sobreajuste; con early stopping se evitó degradar el modelo en épocas tardías.
-- El rendimiento global en validación (~73% accuracy) es razonable, pero el **F1 macro (~66%)** muestra que el modelo aún falla en clases minoritarias y en pares de emociones visualmente parecidas.
-- El principal límite no es solo arquitectura o hiperparámetros, sino la **dificultad semántica** de distinguir tristeza/seriedad y disgusto/seriedad en imágenes de muy baja resolución.
-- En imágenes externas al dataset, la calidad del **alineamiento del rostro** pesa más que un pequeño ajuste de learning rate: el modelo fue entrenado con caras centradas y recortadas.
+> **⚠️ REVISAR ANTES DE LA ENTREGA:** adaptar este texto al formato de respuestas del TP y copiar/refinar en el notebook si corresponde.
+
+- Se construyó una CNN desde cero (3 bloques conv 32-64-128, FC 256) con pipeline configurable en PyTorch.
+- El preprocesamiento final usa **64×64 en escala de grises**, normalización, volteo horizontal y ColorJitter en entrenamiento.
+- La **campaña experimental** (E0–E6) permitió aislar decisiones: early stopping en F1 macro, resolución 64×64 y loss ponderada sin sampler.
+- **Mejor resultado:** E6 — **79.3% accuracy**, **71.3% F1 macro** en validación.
+- Las clases más difíciles (**disgusto**, **miedo**) mejoran con E6 respecto al baseline, pero siguen limitando el F1 macro.
+- Confusiones entre emociones visualmente parecidas (tristeza/seriedad, miedo/sorpresa) persisten; parte del techo es semántico y de resolución, no solo de hiperparámetros.
+- En imágenes externas al dataset, el **alineamiento del rostro** (punto 5) y el uso de `transform_val` son críticos.
 
 ---
 
-## 7. Mejoras propuestas (pendientes de probar)
+## 7. Pendientes pre-entrega
 
-### Preprocesamiento
+> **⚠️ REVISAR ANTES DE LA ENTREGA**
 
-- [ ] Activar rotación (`APLICAR_ROTACION = True`, ~15°)
-- [ ] Activar recorte aleatorio (`APLICAR_RECORTE_ALEATORIO = True`)
-- [ ] Probar resolución 64×64
-- [ ] Comparar RGB vs escala de grises
+### Notebook / Colab
 
-### Entrenamiento
+- [ ] Re-ejecutar §1.8 y verificar que refleja E6
+- [ ] Confirmar outputs de §3 (E6) visibles en el Colab
+- [ ] Completar puntos 4 y 5 con imágenes propias
+- [ ] Habilitar comentarios y acceso al correo de la cátedra
 
-- [ ] Bajar learning rate a `5e-4`
-- [ ] Subir dropout FC a `0.6`
-- [ ] Agregar `weight_decay=1e-4` en Adam
-- [ ] Probar `CrossEntropyLoss` con pesos por clase (complemento al sampler)
-- [ ] Reducir paciencia de early stopping a 5
+### Opcional (no necesario si E6 se congela)
 
-### Arquitectura
-
-- [ ] Más capacidad (filtros o capa conv adicional)
-- [ ] Global Average Pooling para reducir overfitting
-- [ ] Dropout2d en capas convolucionales
-
-### Inferencia (puntos 4 y 5)
-
-- [ ] Afinar Haar: `SCALE_FACTOR=1.05`, `MIN_NEIGHBORS=5`, `MIN_SIZE=(40,40)`
-- [ ] Documentar aciertos punto 4 vs punto 5 con las mismas imágenes
-
-### Análisis cualitativo
-
-- [ ] Revisar visualmente ejemplos mal clasificados tristeza/seriedad y disgusto/seriedad
+- [x] Resolución 64×64 (E4)
+- [x] Loss ponderada sin sampler (E6)
+- [x] Rotación ±10° (E5 — descartada)
+- [ ] RGB vs gris (E7 — no probado)
+- [ ] Afinar Haar en inferencia
 
 ---
 
 ## 8. Tabla comparativa de experimentos
 
-| # | Cambio | Acc val | F1 macro | Mejor época | Notas |
-|---|--------|---------|----------|-------------|-------|
-| 1 | Baseline: balanceo + early stop + LR 1e-3, 48×48 gris | 73.3% | 65.8% | 19 | Resultado actual |
-| 2 | | | | | |
-| 3 | | | | | |
+| Exp | Cambio | Acc val | F1 macro | Mejor época | Notas |
+|-----|--------|---------|----------|-------------|-------|
+| E0 | Baseline | 75.4% | 66.7% | 17 | Ver reporte |
+| E1 | Early stop `val_f1` | 76.8% | 69.5% | 16 | |
+| E4 | 64×64 | 77.5% | 69.7% | 17 | Base previa a E6 |
+| E5 | Rotación ±10° | 77.0% | 68.8% | 32 | Descartado |
+| **E6** | Loss sin sampler | **79.3%** | **71.3%** | **29** | **Final** |
+
+Detalle completo: [`reporte-experimentos.md`](reporte-experimentos.md).
 
 ---
 
-*Última actualización: junio 2026*
+*Última actualización: 2026-06-19 — E6 como config final. ⚠️ Revisar antes de entregar.*
