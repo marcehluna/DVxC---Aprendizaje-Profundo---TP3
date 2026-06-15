@@ -102,11 +102,11 @@ Observaciones:
 - El **punto 5** (Haar + recorte) suele ser más confiable que el punto 4 para fotos reales.
 - Revisar scores softmax cuando top-1 y top-2 están muy cercanos.
 
-Parámetros Haar actuales: `SCALE_FACTOR=1.1`, `MIN_NEIGHBORS=6`, `MIN_SIZE=(30,30)`.
+Parámetros Haar finales (I3): `SCALE_FACTOR=1.05`, `MIN_NEIGHBORS=4`, `MIN_SIZE=(20,20)`, cascade default.
 
-<!-- Registrar resultados de pruebas con imágenes propias -->
-<!-- - Punto 4 (sin recorte): X/Y aciertos -->
-<!-- - Punto 5 (con Haar): X/Y aciertos -->
+Resultados registrados (14 imágenes propias, modelo E6):
+- **Punto 4** (sin Haar): 1/14 aciertos.
+- **Punto 5** (Haar I3 + `transform_val`): **14/14** detección, **4/14** aciertos (`sorpresa 2`, `enojo 2`, `alegria 2`, `tristeza 2`).
 
 ---
 
@@ -130,9 +130,11 @@ Parámetros Haar actuales: `SCALE_FACTOR=1.1`, `MIN_NEIGHBORS=6`, `MIN_SIZE=(30,
 
 ### Notebook / Colab
 
+- [ ] Re-ejecutar §1.2, §2 y §5.1 y confirmar mensajes `✓ config E6 OK` / `✓ inferencia I3 + modelo E6 OK`
 - [ ] Re-ejecutar §1.8 y verificar que refleja E6
 - [ ] Confirmar outputs de §3 (E6) visibles en el Colab
-- [ ] Completar puntos 4 y 5 con imágenes propias
+- [ ] **Completar §3.6** — síntesis final desde `reporte-experimentos.md` (celda placeholder marcada ⬜ PENDIENTE)
+- [x] **E6-b** — inferencia §4–§5 con conjunto alternativo (5/14 P5 vs 4/14 Set A; ver reporte § E6-b)
 - [ ] Habilitar comentarios y acceso al correo de la cátedra
 
 ### Opcional (no necesario si E6 se congela)
@@ -140,8 +142,9 @@ Parámetros Haar actuales: `SCALE_FACTOR=1.1`, `MIN_NEIGHBORS=6`, `MIN_SIZE=(30,
 - [x] Resolución 64×64 (E4)
 - [x] Loss ponderada sin sampler (E6)
 - [x] Rotación ±10° (E5 — descartada)
-- [ ] RGB vs gris (E7 — no probado)
-- [ ] Afinar Haar en inferencia
+- [x] RGB vs gris (E7 — descartado; mantener E6 gris)
+- [x] RandomCrop domain shift (E8 — descartado; −10.4 pp F1 vs E6)
+- [x] Afinar Haar en inferencia (I0–I3; config final I3: scaleFactor 1.05)
 
 ---
 
@@ -154,9 +157,11 @@ Parámetros Haar actuales: `SCALE_FACTOR=1.1`, `MIN_NEIGHBORS=6`, `MIN_SIZE=(30,
 | E4 | 64×64 | 77.5% | 69.7% | 17 | Base previa a E6 |
 | E5 | Rotación ±10° | 77.0% | 68.8% | 32 | Descartado |
 | **E6** | Loss sin sampler | **79.3%** | **71.3%** | **29** | **Final** |
+| E7 | RGB | 79.0% | 70.9% | 25 | Descartado |
+| E8 | RandomCrop train | 70.1% | 60.9% | 24 | Descartado |
 
 Detalle completo: [`reporte-experimentos.md`](reporte-experimentos.md).
 
 ---
 
-*Última actualización: 2026-06-19 — E6 como config final. ⚠️ Revisar antes de entregar.*
+*Última actualización: 2026-06-19 — E6 config final; E7–E8 descartados. Campaña reentrenamiento cerrada. ⚠️ Revisar antes de entregar.*
